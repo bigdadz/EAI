@@ -99,5 +99,110 @@ int SplitCSV(const string s, string &parts[])
    return StringSplit(s, ',', parts);
 }
 
+struct SymbolState
+{
+   datetime         lastBarTime;
+   double           orHigh;
+   double           orLow;
+   bool             rangeReady;
+   ENUM_ENTRY_STATE entryState;
+   ENUM_SIGNAL      armedDir;
+   double           armedLevel;
+   int              armedBarsElapsed;
+   bool             tradedToday;
+   int              atrHandle;
+   int              trendEmaHandle;
+   double           entryPrice;     // for R math
+   double           initialRisk;    // price distance entry->initial SL
+};
+SymbolState g_st[];   // index-aligned with g_symbol[]
+
+int OnInit()
+{
+   string syms[], shs[], wins[], sprs[];
+   int n  = SplitCSV(InpSymbols, syms);
+   int n2 = SplitCSV(InpORStartHours, shs);
+   int n3 = SplitCSV(InpORWindowMins, wins);
+   int n4 = SplitCSV(InpMaxSpreadPts, sprs);
+   if(n <= 0 || n != n2 || n != n3 || n != n4)
+   {
+      PrintFormat("PortfolioORB: config length mismatch syms=%d starts=%d wins=%d spreads=%d", n, n2, n3, n4);
+      return INIT_FAILED;
+   }
+   if(n > MAX_SYMBOLS) { Print("PortfolioORB: too many symbols"); return INIT_FAILED; }
+
+   g_symCount = n;
+   ArrayResize(g_symbol, n);  ArrayResize(g_orStartH, n); ArrayResize(g_orStartM, n);
+   ArrayResize(g_orEndH, n);  ArrayResize(g_orEndM, n);   ArrayResize(g_maxSpread, n);
+   ArrayResize(g_st, n);
+
+   for(int i = 0; i < n; i++)
+   {
+      g_symbol[i]   = syms[i];
+      g_orStartH[i] = (int)StringToInteger(shs[i]);
+      g_orStartM[i] = 0;
+      int win       = (int)StringToInteger(wins[i]);
+      int endTotal  = g_orStartH[i]*60 + g_orStartM[i] + win;
+      g_orEndH[i]   = endTotal / 60;
+      g_orEndM[i]   = endTotal % 60;
+      g_maxSpread[i]= (int)StringToInteger(sprs[i]);
+
+      if(!SymbolSelect(g_symbol[i], true))
+         PrintFormat("PortfolioORB: WARN could not select %s in Market Watch", g_symbol[i]);
+
+      g_st[i].lastBarTime      = 0;
+      g_st[i].orHigh           = 0.0;
+      g_st[i].orLow            = 0.0;
+      g_st[i].rangeReady       = false;
+      g_st[i].entryState       = ENTRY_IDLE;
+      g_st[i].armedDir         = SIGNAL_NONE;
+      g_st[i].armedLevel       = 0.0;
+      g_st[i].armedBarsElapsed = 0;
+      g_st[i].tradedToday      = false;
+      g_st[i].entryPrice       = 0.0;
+      g_st[i].initialRisk      = 0.0;
+
+      g_st[i].atrHandle = iATR(g_symbol[i], InpTimeframe, InpATRPeriod);
+      if(g_st[i].atrHandle == INVALID_HANDLE)
+      { PrintFormat("PortfolioORB: ATR init FAILED for %s", g_symbol[i]); return INIT_FAILED; }
+
+      g_st[i].trendEmaHandle = INVALID_HANDLE;
+      if(InpUseTrendFilter)
+      {
+         g_st[i].trendEmaHandle = iMA(g_symbol[i], InpTrendTF, InpTrendEMA, 0, MODE_EMA, PRICE_CLOSE);
+         if(g_st[i].trendEmaHandle == INVALID_HANDLE)
+         { PrintFormat("PortfolioORB: EMA init FAILED for %s", g_symbol[i]); return INIT_FAILED; }
+      }
+   }
+
+   trade.SetExpertMagicNumber(InpMagic);
+   trade.SetDeviationInPoints(InpDeviation);
+   // Filling mode is set per-symbol just before each order (symbols differ).
+
+   g_dayStartEquity = AccountInfoDouble(ACCOUNT_EQUITY);
+   g_lastDay = -1;
+
+   PrintFormat("PortfolioORB v1.00 init | %d symbols | ServerTime=%s",
+               g_symCount, TimeToString(TimeTradeServer(), TIME_DATE|TIME_MINUTES));
+   for(int i = 0; i < g_symCount; i++)
+      PrintFormat("  [%d] %s OR=%02d:%02d-%02d:%02d maxSpread=%d",
+                  i, g_symbol[i], g_orStartH[i], g_orStartM[i], g_orEndH[i], g_orEndM[i], g_maxSpread[i]);
+
+   EventSetTimer(1);
+   return INIT_SUCCEEDED;
+}
+
+void OnDeinit(const int reason)
+{
+   for(int i = 0; i < g_symCount; i++)
+   {
+      if(g_st[i].atrHandle      != INVALID_HANDLE) IndicatorRelease(g_st[i].atrHandle);
+      if(g_st[i].trendEmaHandle != INVALID_HANDLE) IndicatorRelease(g_st[i].trendEmaHandle);
+   }
+   EventKillTimer();
+   Comment("");
+   Print("PortfolioORB deinitialized. Reason: ", reason);
+}
+
 void OnTick()  { }
 void OnTimer() { }
