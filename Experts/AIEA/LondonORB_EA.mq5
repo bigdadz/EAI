@@ -258,7 +258,8 @@ bool NewsBlocked()
 
       MqlCalendarCountry country;
       if(!CalendarCountryById(event.country_id, country)) continue;
-      if(StringFind(InpNewsCurrencies, country.currency) < 0) continue;
+      // exact token match (avoids substring false-positives); list is comma-separated 3-letter codes
+      if(StringFind("," + InpNewsCurrencies + ",", "," + country.currency + ",") < 0) continue;
 
       return true;
    }
@@ -285,13 +286,22 @@ bool RetestConfirmed(ENUM_SIGNAL dir)
 //=== LIFECYCLE =====================================================
 int OnInit()
 {
-   g_atrHandle      = iATR(_Symbol, InpTimeframe, InpATRPeriod);
-   g_trendEmaHandle = iMA(_Symbol, InpTrendTF, InpTrendEMA, 0, MODE_EMA, PRICE_CLOSE);
-
-   if(g_atrHandle == INVALID_HANDLE || g_trendEmaHandle == INVALID_HANDLE)
+   g_atrHandle = iATR(_Symbol, InpTimeframe, InpATRPeriod);
+   if(g_atrHandle == INVALID_HANDLE)
    {
-      Print("LondonORB: indicator handle init FAILED");
+      Print("LondonORB: ATR handle init FAILED");
       return INIT_FAILED;
+   }
+
+   // EMA handle only needed when the trend filter is enabled
+   if(InpUseTrendFilter)
+   {
+      g_trendEmaHandle = iMA(_Symbol, InpTrendTF, InpTrendEMA, 0, MODE_EMA, PRICE_CLOSE);
+      if(g_trendEmaHandle == INVALID_HANDLE)
+      {
+         Print("LondonORB: trend EMA handle init FAILED");
+         return INIT_FAILED;
+      }
    }
 
    trade.SetExpertMagicNumber(InpMagic);
