@@ -536,9 +536,98 @@ void OnDeinit(const int reason)
 
 void OnTick()
 {
+   // New-day reset
+   if(IsNewDay())
+   {
+      g_dayStartEquity  = AccountInfoDouble(ACCOUNT_EQUITY);
+      g_tradedToday     = false;
+      g_rangeReady      = false;
+      g_entryState      = ENTRY_IDLE;
+      g_armedDir        = SIGNAL_NONE;
+      g_armedBarsElapsed= 0;
+      g_ddStopped       = false;
+      g_newsWarned      = false;
+   }
+
+   // Manage any open position every tick
+   ManageTrailing();
+
+   // Force-close cutoff
+   if(InpForceCloseEnable && PastForceClose())
+   {
+      CloseAll();
+      UpdateDashboard("force-close window", SIGNAL_NONE);
+      return;
+   }
+
+   // Only evaluate logic on a new completed bar
+   if(!IsNewBar())
+   {
+      UpdateDashboard("intrabar", SIGNAL_NONE);
+      return;
+   }
+
+   // Daily drawdown circuit breaker
+   if(IsDailyDDExceeded())
+   {
+      g_ddStopped = true;
+      if(InpDDAction == DD_CLOSE_ALL) CloseAll();
+      UpdateDashboard("DD stopped", SIGNAL_NONE);
+      return;
+   }
+
+   // Finalize range once we are past the OR window
+   int nowMin = MinutesOfDay(TimeCurrent());
+   if(!g_rangeReady && !InORWindow() &&
+      nowMin >= InpOREndHour * 60 + InpOREndMin)
+      FinalizeRange();
+
+   if(!g_rangeReady)            { UpdateDashboard("collecting range", SIGNAL_NONE); return; }
+   if(g_tradedToday)            { UpdateDashboard("traded today", SIGNAL_NONE);     return; }
+   if(!InTradingWindow())       { UpdateDashboard("outside trade window", SIGNAL_NONE); return; }
+   if(!RangeSizeOK())           { UpdateDashboard("range size rejected", SIGNAL_NONE); return; }
+
+   // Entry state machine
+   ENUM_SIGNAL displaySig = SIGNAL_NONE;
+
+   if(g_entryState == ENTRY_IDLE)
+   {
+      ENUM_SIGNAL sig = CheckBreakout();
+      displaySig = sig;
+      if(sig != SIGNAL_NONE && TrendFilterOK(sig) && !NewsBlocked() && SpreadOK())
+      {
+         if(InpUseRetest)
+         {
+            g_entryState       = ENTRY_ARMED;
+            g_armedDir         = sig;
+            g_armedLevel       = (sig == SIGNAL_BUY) ? g_orHigh : g_orLow;
+            g_armedBarsElapsed = 0;
+            if(InpDebugMode) Print("LondonORB: ARMED ", (sig == SIGNAL_BUY ? "BUY" : "SELL"));
+         }
+         else
+            OpenTrade(sig);
+      }
+   }
+   else if(g_entryState == ENTRY_ARMED)
+   {
+      displaySig = g_armedDir;
+      g_armedBarsElapsed++;
+      if(g_armedBarsElapsed > InpRetestTimeoutBars)
+      {
+         g_entryState = ENTRY_IDLE;
+         if(InpDebugMode) Print("LondonORB: retest timeout — disarmed");
+      }
+      else if(RetestConfirmed(g_armedDir) && !NewsBlocked() && SpreadOK())
+      {
+         OpenTrade(g_armedDir);
+      }
+   }
+
+   UpdateDashboard("active", displaySig);
 }
 
 void OnTimer()
 {
+   UpdateDashboard("active", SIGNAL_NONE);
 }
 //+------------------------------------------------------------------+
