@@ -506,7 +506,25 @@ bool CorrBlocked(int i, ENUM_SIGNAL dir)
    return false;
 }
 
-void UpdateDashboard() { }
+void UpdateDashboard()
+{
+   if(!InpShowDashboard) return;
+   double eq    = AccountInfoDouble(ACCOUNT_EQUITY);
+   double ddPct = (g_dayStartEquity > 0) ? (g_dayStartEquity - eq)/g_dayStartEquity*100.0 : 0.0;
+
+   string txt = StringFormat("=== Portfolio ORB EA ===\nServer: %s   Equity: %.2f\nDaily DD: %.2f%% / %.2f%%   DD-stopped: %s\n",
+                  TimeToString(TimeCurrent(), TIME_MINUTES), eq, ddPct, InpMaxPortfolioDDPercent,
+                  (g_ddStopped ? "yes" : "no"));
+   for(int i = 0; i < g_symCount; i++)
+   {
+      string st = (g_st[i].entryState==ENTRY_IDLE)?"IDLE":(g_st[i].entryState==ENTRY_ARMED)?"ARMED":"DONE";
+      txt += StringFormat("%-9s OR[%s] H=%s L=%s %s traded=%s sp=%d\n",
+                g_symbol[i], (g_st[i].rangeReady?"rdy":"pend"),
+                DoubleToString(g_st[i].orHigh, SymDigits(i)), DoubleToString(g_st[i].orLow, SymDigits(i)),
+                st, (g_st[i].tradedToday?"Y":"N"), (int)SymbolInfoInteger(g_symbol[i], SYMBOL_SPREAD));
+   }
+   Comment(txt);
+}
 
 void ProcessSymbol(int i)
 {
