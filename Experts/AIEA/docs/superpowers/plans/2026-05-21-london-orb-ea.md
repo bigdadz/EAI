@@ -14,14 +14,16 @@
 
 ## ⚠️ Toolchain reality (read before executing)
 
-`wine` is not on PATH on this macOS host, so the EA **cannot be compiled or run from the shell**. Two step types in this plan are performed **by the human in MetaTrader**, not by the agent:
+Headless compilation **works** via Wine (validated 2026-05-21). The agent compiles each task itself; only the Strategy Tester needs the human.
 
-- **COMPILE CHECKPOINT** → User opens the file in MetaEditor and presses **F7**. Pass = `0 errors, 0 warnings` in the Toolbox → Errors tab.
-- **RUN CHECKPOINT** → User attaches a script/EA in the MT5 terminal (or runs Strategy Tester) and reads the **Experts** / **Journal** log.
+- **COMPILE CHECKPOINT** → agent runs `bash Experts/AIEA/tools/compile.sh "<abs path to .mq5>"`. Pass = script prints `[compile] PASS` and exits 0; on failure it prints per-line `error ...` messages to fix. (Mechanism: homebrew `wine` + throwaway prefix `~/.wine_orb` with a local copy of the real `Include`; the source is mirrored into a `C:\mt\MQL5` sandbox and compiled by the real `MetaEditor64.exe`. The bundle's own prefix is never touched.)
+- **RUN CHECKPOINT** → **human only**: attach the script/EA in the MT5 terminal or run the Strategy Tester, then read the **Experts**/**Journal** log. Wine can't drive the tester headlessly here.
 
-Agent steps (write code, `git add/commit`) run normally in the shell. Each task ends with a COMPILE CHECKPOINT and a commit. Do not mark a task complete until the user confirms the checkpoint passed.
+Wherever a task below says "COMPILE CHECKPOINT (user) — F7", the agent instead runs `tools/compile.sh`. The F7 path remains valid as a manual fallback.
 
-All `git` commands run from the repo root:
+Agent steps (write code, compile, `git add/commit`) run normally in the shell. Each task ends with a passing compile + a commit.
+
+All `git` and `compile.sh` commands run from the repo root:
 `cd "/Users/bigdadz/Library/Application Support/net.metaquotes.wine.metatrader5/drive_c/Program Files/MetaTrader 5/MQL5"`
 
 ---
