@@ -200,3 +200,12 @@ LondonORB_EA.mq5
 ## 10. ค่า Default ตั้งต้น (ปรับได้ทั้งหมด — เป็นจุดเริ่ม optimize)
 
 OR 08:00–08:30, trade ถึง 12:00, force-close 20:00 (server time, Exness GMT+0); buffer = ATR×0.10; TP = 1.8R; BE +1.0R; trailing เริ่ม +1.2R, ระยะ 200 pts; risk 1%/ไม้; daily DD 3%; ตัวกรองเปิดครบ 4 ตัว (toggle อิสระ); spread guard 40 pts (ตั้ง `InpMaxSpreadPoints=0` เพื่อปิด)
+
+## 11. As-built notes (อัปเดตหลัง implement)
+
+ส่วนที่ต่างจากแบบเดิมเล็กน้อย (functionally equivalent):
+- **`InpMaxTradesPerDay` ถูกตัดออก** — กฎ 1 ไม้/วัน บังคับด้วย state (`g_tradedToday` + `ENTRY_DONE`) อยู่แล้ว input นี้ไม่ถูกใช้จริงจึงเอาออกกัน config หลอกตา
+- **การสร้างกรอบ** ใช้ `FinalizeRange()` (CopyRates ครอบช่วง OR ทีเดียว) แทน accumulator แบบ incremental — ผลเท่ากัน เรียบง่ายกว่า
+- **Daily-DD breaker เช็คทุก tick** (ไม่ใช่เฉพาะแท่งใหม่) เพื่อป้องกัน intra-bar crash ทันเวลา; latch ทั้งวันเมื่อ trip
+- **`trade.SetTypeFillingBySymbol(_Symbol)`** ตั้งใน OnInit (Exness/ECN ต้องการ IOC/RETURN ไม่ใช่ FOK default)
+- **ข้อจำกัดที่รู้:** ถ้าปิด `InpForceCloseEnable` แล้วถือไม้ข้ามวัน BE/trailing จะหยุดทำงานกับไม้นั้น (g_initialRisk reset เป็น 0) — ไม้ยังมี SL/TP เดิมป้องกันอยู่ ค่า default (force-close เปิด) ครอบกรณีนี้แล้ว
