@@ -455,6 +455,38 @@ void ManageTrailing()
    }
 }
 
+//=== DISPLAY =======================================================
+void UpdateDashboard(string phase, ENUM_SIGNAL signal)
+{
+   if(!InpShowDashboard) return;
+
+   double eq    = AccountInfoDouble(ACCOUNT_EQUITY);
+   double ddPct = (g_dayStartEquity > 0) ? (g_dayStartEquity - eq) / g_dayStartEquity * 100.0 : 0.0;
+   string sigStr = (signal == SIGNAL_BUY) ? "BUY" : (signal == SIGNAL_SELL) ? "SELL" : "-";
+   string stateStr = (g_entryState == ENTRY_IDLE) ? "IDLE"
+                   : (g_entryState == ENTRY_ARMED) ? "ARMED" : "DONE";
+
+   string txt = StringFormat(
+      "=== London ORB EA ===\n"
+      "Symbol: %s   Server: %s\n"
+      "Phase: %s\n"
+      "Range: %s  H=%s  L=%s\n"
+      "Entry state: %s   Signal: %s\n"
+      "Traded today: %s   Spread: %d\n"
+      "Daily DD: %.2f%% / %.2f%%   DD-stopped: %s",
+      _Symbol, TimeToString(TimeCurrent(), TIME_MINUTES),
+      phase,
+      (g_rangeReady ? "ready" : "pending"),
+      DoubleToString(g_orHigh, _Digits), DoubleToString(g_orLow, _Digits),
+      stateStr, sigStr,
+      (g_tradedToday ? "yes" : "no"),
+      (int)SymbolInfoInteger(_Symbol, SYMBOL_SPREAD),
+      ddPct, InpMaxDailyDDPercent,
+      (g_ddStopped ? "yes" : "no"));
+
+   Comment(txt);
+}
+
 //=== LIFECYCLE =====================================================
 int OnInit()
 {
