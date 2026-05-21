@@ -420,26 +420,38 @@ void ManageTrailing()
    double profit = (type == POSITION_TYPE_BUY) ? (price - entry) : (entry - price);
    double rMult  = profit / risk;
 
-   // Break-even
+   // Break-even (curSL==0 => no stop set). Return after moving to BE so the
+   // trailing block doesn't fire a second modify on the same tick with a stale curSL.
    if(rMult >= InpBE_TriggerR)
    {
       double be = NormalizeDouble(entry, _Digits);
-      bool need = (type == POSITION_TYPE_BUY)  ? (curSL < be)
-                : (type == POSITION_TYPE_SELL) ? (curSL > be || curSL == 0)
-                : false;
-      if(need) trade.PositionModify(_Symbol, be, curTP);
+      bool needBE = (type == POSITION_TYPE_BUY)  ? (curSL < be)
+                  : (type == POSITION_TYPE_SELL) ? (curSL > be || curSL == 0)
+                  : false;
+      if(needBE)
+      {
+         if(!trade.PositionModify(_Symbol, be, curTP) && InpDebugMode)
+            PrintFormat("LondonORB: BE modify FAILED retcode=%d (%s)",
+                        trade.ResultRetcode(), trade.ResultRetcodeDescription());
+         return;
+      }
    }
 
-   // Trailing
+   // Trailing (curSL==0 => no stop set)
    if(rMult >= InpTrailStartR)
    {
       double dist  = InpTrailDistPoints * _Point;
       double newSL = (type == POSITION_TYPE_BUY) ? (price - dist) : (price + dist);
       newSL = NormalizeDouble(newSL, _Digits);
-      bool need = (type == POSITION_TYPE_BUY)  ? (newSL > curSL)
-                : (type == POSITION_TYPE_SELL) ? (newSL < curSL || curSL == 0)
-                : false;
-      if(need) trade.PositionModify(_Symbol, newSL, curTP);
+      bool needTrail = (type == POSITION_TYPE_BUY)  ? (newSL > curSL)
+                     : (type == POSITION_TYPE_SELL) ? (newSL < curSL || curSL == 0)
+                     : false;
+      if(needTrail)
+      {
+         if(!trade.PositionModify(_Symbol, newSL, curTP) && InpDebugMode)
+            PrintFormat("LondonORB: trail modify FAILED retcode=%d (%s)",
+                        trade.ResultRetcode(), trade.ResultRetcodeDescription());
+      }
    }
 }
 
