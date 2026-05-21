@@ -161,9 +161,11 @@ void FinalizeRange()
    datetime orStart  = dayStart + (InpORStartHour * 3600 + InpORStartMin * 60);
    datetime orEnd    = dayStart + (InpOREndHour   * 3600 + InpOREndMin   * 60);
 
+   // CopyRates selects bars by OPEN time, inclusive of both bounds; orEnd-1s
+   // keeps the window half-open [orStart, orEnd) for all standard timeframes.
    MqlRates rates[];
    int copied = CopyRates(_Symbol, InpTimeframe, orStart, orEnd - 1, rates);
-   if(copied <= 0) { g_rangeReady = false; return; }
+   if(copied <= 0) { g_orHigh = 0.0; g_orLow = 0.0; g_rangeReady = false; return; }
 
    double hi = -DBL_MAX, lo = DBL_MAX;
    for(int i = 0; i < copied; i++)
