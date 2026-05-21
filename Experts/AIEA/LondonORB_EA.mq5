@@ -394,6 +394,55 @@ void OpenTrade(ENUM_SIGNAL signal)
    }
 }
 
+void CloseAll()
+{
+   if(PositionSelect(_Symbol) &&
+      PositionGetInteger(POSITION_MAGIC) == InpMagic)
+      trade.PositionClose(_Symbol);
+}
+
+void ManageTrailing()
+{
+   if(!PositionSelect(_Symbol)) return;
+   if(PositionGetInteger(POSITION_MAGIC) != InpMagic) return;
+
+   long   type  = PositionGetInteger(POSITION_TYPE);
+   double entry = PositionGetDouble(POSITION_PRICE_OPEN);
+   double curSL = PositionGetDouble(POSITION_SL);
+   double curTP = PositionGetDouble(POSITION_TP);
+   double price = (type == POSITION_TYPE_BUY)
+                  ? SymbolInfoDouble(_Symbol, SYMBOL_BID)
+                  : SymbolInfoDouble(_Symbol, SYMBOL_ASK);
+
+   double risk = g_initialRisk;
+   if(risk <= 0) return;
+
+   double profit = (type == POSITION_TYPE_BUY) ? (price - entry) : (entry - price);
+   double rMult  = profit / risk;
+
+   // Break-even
+   if(rMult >= InpBE_TriggerR)
+   {
+      double be = NormalizeDouble(entry, _Digits);
+      bool need = (type == POSITION_TYPE_BUY)  ? (curSL < be)
+                : (type == POSITION_TYPE_SELL) ? (curSL > be || curSL == 0)
+                : false;
+      if(need) trade.PositionModify(_Symbol, be, curTP);
+   }
+
+   // Trailing
+   if(rMult >= InpTrailStartR)
+   {
+      double dist  = InpTrailDistPoints * _Point;
+      double newSL = (type == POSITION_TYPE_BUY) ? (price - dist) : (price + dist);
+      newSL = NormalizeDouble(newSL, _Digits);
+      bool need = (type == POSITION_TYPE_BUY)  ? (newSL > curSL)
+                : (type == POSITION_TYPE_SELL) ? (newSL < curSL || curSL == 0)
+                : false;
+      if(need) trade.PositionModify(_Symbol, newSL, curTP);
+   }
+}
+
 //=== LIFECYCLE =====================================================
 int OnInit()
 {
