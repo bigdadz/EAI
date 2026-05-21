@@ -99,15 +99,84 @@ bool             g_newsWarned      = false;
 double           g_entryPrice      = 0.0;  // set on open, for R math
 double           g_initialRisk     = 0.0;  // price distance entry->initial SL
 
+//=== TIME / SESSION ================================================
+int MinutesOfDay(datetime t)
+{
+   MqlDateTime d;
+   TimeToStruct(t, d);
+   return d.hour * 60 + d.min;
+}
+
+bool IsNewBar()
+{
+   datetime t = iTime(_Symbol, InpTimeframe, 0);
+   if(t != g_lastBarTime) { g_lastBarTime = t; return true; }
+   return false;
+}
+
+bool IsNewDay()
+{
+   MqlDateTime d;
+   TimeToStruct(TimeCurrent(), d);
+   if(d.day != g_lastDay) { g_lastDay = d.day; return true; }
+   return false;
+}
+
+bool InORWindow()
+{
+   int m = MinutesOfDay(TimeCurrent());
+   return (m >= InpORStartHour * 60 + InpORStartMin &&
+           m <  InpOREndHour   * 60 + InpOREndMin);
+}
+
+bool InTradingWindow()
+{
+   int m = MinutesOfDay(TimeCurrent());
+   return (m >= InpOREndHour    * 60 + InpOREndMin &&
+           m <  InpTradeEndHour * 60 + InpTradeEndMin);
+}
+
+bool PastForceClose()
+{
+   int m = MinutesOfDay(TimeCurrent());
+   return m >= InpForceCloseHour * 60 + InpForceCloseMin;
+}
+
 //=== LIFECYCLE =====================================================
 int OnInit()
 {
+   g_atrHandle      = iATR(_Symbol, InpTimeframe, InpATRPeriod);
+   g_trendEmaHandle = iMA(_Symbol, InpTrendTF, InpTrendEMA, 0, MODE_EMA, PRICE_CLOSE);
+
+   if(g_atrHandle == INVALID_HANDLE || g_trendEmaHandle == INVALID_HANDLE)
+   {
+      Print("LondonORB: indicator handle init FAILED");
+      return INIT_FAILED;
+   }
+
+   trade.SetExpertMagicNumber(InpMagic);
+   trade.SetDeviationInPoints(InpDeviation);
+
+   g_dayStartEquity = AccountInfoDouble(ACCOUNT_EQUITY);
+   g_lastDay        = -1;
+
+   long offsetSec = (long)(TimeTradeServer() - TimeGMT());
+   PrintFormat("LondonORB v1.00 init | Symbol=%s | ServerTime=%s | est.GMT offset=%d h (0 in tester)",
+               _Symbol,
+               TimeToString(TimeTradeServer(), TIME_DATE | TIME_MINUTES),
+               (int)(offsetSec / 3600));
+
+   EventSetTimer(1);
    return INIT_SUCCEEDED;
 }
 
 void OnDeinit(const int reason)
 {
+   if(g_atrHandle      != INVALID_HANDLE) IndicatorRelease(g_atrHandle);
+   if(g_trendEmaHandle != INVALID_HANDLE) IndicatorRelease(g_trendEmaHandle);
+   EventKillTimer();
    Comment("");
+   Print("LondonORB deinitialized. Reason: ", reason);
 }
 
 void OnTick()
