@@ -562,19 +562,20 @@ void OnTick()
       return;
    }
 
-   // Only evaluate logic on a new completed bar
-   if(!IsNewBar())
-   {
-      UpdateDashboard("intrabar", SIGNAL_NONE);
-      return;
-   }
-
-   // Daily drawdown circuit breaker (latches for the rest of the day once tripped)
+   // Daily drawdown circuit breaker — checked every tick (equity-based, not bar
+   // data) so an intra-bar crash latches/closes promptly. Latches for the day.
    if(g_ddStopped || IsDailyDDExceeded())
    {
       g_ddStopped = true;
       if(InpDDAction == DD_CLOSE_ALL) CloseAll();
       UpdateDashboard("DD stopped", SIGNAL_NONE);
+      return;
+   }
+
+   // Only evaluate entry logic on a new completed bar
+   if(!IsNewBar())
+   {
+      UpdateDashboard("intrabar", SIGNAL_NONE);
       return;
    }
 
