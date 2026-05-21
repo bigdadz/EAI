@@ -477,5 +477,34 @@ void ManageTrailing(int i)
    }
 }
 
+// Blocked if InpUseCorrGuard and a same-direction position is already open
+// on another symbol within the same correlation group as g_symbol[i].
+bool CorrBlocked(int i, ENUM_SIGNAL dir)
+{
+   if(!InpUseCorrGuard) return false;
+   string groups[];
+   int ng = StringSplit(InpCorrGroups, ';', groups);
+   for(int gi = 0; gi < ng; gi++)
+   {
+      string members[];
+      int nm = StringSplit(groups[gi], ',', members);
+      bool iInGroup = false;
+      for(int m = 0; m < nm; m++) if(members[m] == g_symbol[i]) { iInGroup = true; break; }
+      if(!iInGroup) continue;
+      // i is in this group: scan other members for a same-direction open position
+      for(int m = 0; m < nm; m++)
+      {
+         if(members[m] == g_symbol[i]) continue;
+         if(PositionSelect(members[m]) && PositionGetInteger(POSITION_MAGIC) == InpMagic)
+         {
+            long t = PositionGetInteger(POSITION_TYPE);
+            ENUM_SIGNAL openDir = (t == POSITION_TYPE_BUY) ? SIGNAL_BUY : SIGNAL_SELL;
+            if(openDir == dir) return true;   // same-direction correlated exposure
+         }
+      }
+   }
+   return false;
+}
+
 void OnTick()  { }
 void OnTimer() { }
