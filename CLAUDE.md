@@ -42,6 +42,7 @@ Native MT5, so it's **simpler than macOS+Wine**: no Wine prefix, no sandbox `Inc
 - Logs/reports are **UTF-16** → `Get-Content -Encoding Unicode`. The HTML report lands in the **data-folder root** as `<Report>.htm`.
 - The per-agent `final balance` log (`Tester\Agent-127.0.0.1-3000\logs`) may **not** be produced on this build — rely on the HTML report for stats (what `test.ps1`/`sweep.ps1` do).
 - `Profiles\Tester\<expert>.set` override, `Model=1` for multi-month runs, and retry-on-silent-failure all apply same as macOS; `sweep.ps1` moves the `.set` aside (restores in `finally`).
+- **Server timezone = UK time: GMT+0 (winter) / GMT+1 (summer), EU/UK DST** (springs forward last Sun of March, back last Sun of Oct). Measured from FX weekend gaps: weekly open Sun 22:00 server / close Fri 21:00 (and Sun 21:00 / Fri 20:00 during the Mar 8–29 window where US DST is on but EU isn't). This is the **same GMT+0 baseline the OR hours were tuned for on Exness**, so OR-start hours transfer to IUX 1:1 — no shift needed. (`TimeTradeServer()−TimeGMT()` is 0 in the tester, so timezone must be inferred from data; `tools/TZProbe.mq5` does this.) Only nuance: IUX uses EU-DST dates vs Exness's US-DST, a ~3-week/year 1h mismatch — negligible for ORB. The FX legs' 2026 losses are out-of-sample / broker differences, NOT a timezone misalignment.
 
 ## Conventions
 - EAs may be single-file `.mq5` (e.g. `LondonORB_EA.mq5` at repo root) — keep clean commented sections; modular isn't required.
