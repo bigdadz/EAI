@@ -1,6 +1,6 @@
 //+------------------------------------------------------------------+
-//|                                       Test_LondonORB_Math.mq5    |
-//|        Regression checks for LondonORB pure arithmetic.          |
+//|                                       Test_ORB_Math.mq5    |
+//|        Regression checks for PortfolioORB pure arithmetic.          |
 //|        Attach to any chart; read results in the Experts tab.     |
 //+------------------------------------------------------------------+
 #property script_show_inputs

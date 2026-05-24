@@ -5,9 +5,9 @@
 > has its own tooling and its own symbol-naming convention; don't mix them.
 
 ## Repo layout
-- **This repo IS the `MQL5/Experts/EAI/` folder.** Clone it directly into the MT5 data folder's `Experts/` dir (`git clone <url>` from inside `<MT5 data>/MQL5/Experts/` → produces `EAI/`). Repo root holds the EAs (`LondonORB_EA.mq5`, `PortfolioORB_EA.mq5`); `tools/`, `tests/`, `docs/` are siblings.
+- **This repo IS the `MQL5/Experts/EAI/` folder.** Clone it directly into the MT5 data folder's `Experts/` dir (`git clone <url>` from inside `<MT5 data>/MQL5/Experts/` → produces `EAI/`). Repo root holds the EA (`PortfolioORB_EA.mq5`); `tools/`, `tests/`, `docs/` are siblings.
 - All repo-relative commands below run from the repo root (= `MQL5/Experts/EAI/`).
-- **EAs:** `LondonORB_EA.mq5` — single-symbol London ORB, 1 trade/day. `PortfolioORB_EA.mq5` — multi-symbol ORB: per-symbol OR window + state, account-level DD breaker, correlation guard.
+- **EA:** `PortfolioORB_EA.mq5` — multi-symbol ORB: per-symbol OR window + state, account-level DD breaker, correlation guard. (Single-symbol `LondonORB_EA.mq5` was removed 2026-05-24 — superseded by PortfolioORB, which runs the same ORB logic per symbol.)
 - **Designs & backtest results live in `docs/superpowers/`** (`specs/` = designs + results, `plans/` = build plans). Note: those docs predate the rename and still reference the old `Experts/AIEA/` paths — historical, not current.
 
 ## Build & test MQL5 headlessly (no MetaTrader GUI required)
@@ -39,7 +39,7 @@ Native MT5, so it's **simpler than macOS+Wine**: no Wine prefix, no sandbox `Inc
 
 ### Windows tester gotchas (each cost real debugging time)
 - **Symbol names DIFFER by IUX account type — confirm which account the terminal is logged into:**
-  - **IUX Standard (the currently-connected account): symbols carry a `.iux` suffix** — gold is **`XAUUSD.iux`** (verified: tradeable, has local tick history, runs backtests; `valuePerPoint=$1/lot/pt`, `minLot 0.01`, `contract 100oz`, `point 0.01`, `stopsLevel 0`). `PortfolioORB_EA`'s `InpSymbols` default is `XAUUSD.iux` for this reason. Run gold standalone with `Symbol=XAUUSD.iux` + `InpSymbols=XAUUSD.iux`, `InpORStartHours=12`, `InpORWindowMins=15`, `InpMaxSpreadPts=600`.
+  - **IUX Standard (the currently-connected account): symbols carry a `.iux` suffix** — gold is **`XAUUSD.iux`** (verified: tradeable, has local tick history, runs backtests; `valuePerPoint=$1/lot/pt`, `minLot 0.01`, `contract 100oz`, `point 0.01`, `stopsLevel 0`). `PortfolioORB_EA` takes **base** symbol names in `InpSymbols`/`InpCorrGroups` + a broker `InpSymbolSuffix` (appended via `WithSuffix()`); switch broker by changing only the suffix (Exness `m`, IUX Standard `.iux`, IUX-other `.`, none empty). Default = the validated 2-leg IUX portfolio `InpSymbols="USDJPY,XAUUSD"` `InpORStartHours="9,12"` `InpORWindowMins="30,15"` `InpMaxSpreadPts="40,600"` `InpSymbolSuffix=".iux"` (GBPUSD/EURUSD London legs dropped — lose every year on IUX; 4-leg config kept as a comment). Run gold standalone with `Symbol=XAUUSD.iux` + `InpSymbols=XAUUSD`, `InpSymbolSuffix=.iux`, `InpORStartHours=12`, `InpORWindowMins=15`, `InpMaxSpreadPts=600`.
   - **The other IUX account uses a TRAILING DOT:** `XAUUSD.`, `GBPUSD.`, `EURUSD.`, `BTCUSD.` — NOT `GBPUSDm` (Exness) and NOT plain `GBPUSD`. A trailing-dot name makes MT5 **hash its history-folder name** (e.g. `0B1396DF…` = `BTCUSD.`). Plain-named `bases\IUXMarkets-Live\history\GBPUSD` folders + `British Pound`/`Euro` chart profiles are stale MetaQuotes demo leftovers — ignore.
   - **Only symbols with LOCAL tick history resolve in a headless `/config` run.** With the terminal closed/disconnected, `SymbolSelect`/chart-load returns `NOT_AVAILABLE` / `symbol X not exist` for any symbol whose history isn't cached (e.g. `XAUUSD.`, `GBPUSD.` came back NOT_AVAILABLE while only `XAUUSD.iux` resolved). A symbol may return a valid quote *transiently* right after the live terminal closes (warm Market Watch) yet fail standalone. **Fix:** open the terminal, connect, and let it download M5 history for the target symbol *before* running headless. Confirm names via `DumpSymbols`/`tools/DumpSpecs.mq5` (writes specs to `Common\Files\symbol_specs.csv`); chart names are plaintext in `MQL5\Profiles\Charts\<profile>\*.chr`.
 - **Terminal must be CLOSED** before a `/config` run — a 2nd instance on the same data folder is silently ignored (no test runs). `compile/test/sweep.ps1` assert this and abort with a clear message.
@@ -49,7 +49,7 @@ Native MT5, so it's **simpler than macOS+Wine**: no Wine prefix, no sandbox `Inc
 - **Server timezone = UK time: GMT+0 (winter) / GMT+1 (summer), EU/UK DST** (springs forward last Sun of March, back last Sun of Oct). Measured from FX weekend gaps: weekly open Sun 22:00 server / close Fri 21:00 (and Sun 21:00 / Fri 20:00 during the Mar 8–29 window where US DST is on but EU isn't). This is the **same GMT+0 baseline the OR hours were tuned for on Exness**, so OR-start hours transfer to IUX 1:1 — no shift needed. (`TimeTradeServer()−TimeGMT()` is 0 in the tester, so timezone must be inferred from data; `tools/TZProbe.mq5` does this.) Only nuance: IUX uses EU-DST dates vs Exness's US-DST, a ~3-week/year 1h mismatch — negligible for ORB. The FX legs' 2026 losses are out-of-sample / broker differences, NOT a timezone misalignment.
 
 ## Conventions
-- EAs may be single-file `.mq5` (e.g. `LondonORB_EA.mq5` at repo root) — keep clean commented sections; modular isn't required.
+- EAs may be single-file `.mq5` (e.g. `PortfolioORB_EA.mq5` at repo root) — keep clean commented sections; modular isn't required.
 - The unit-test script lives under `tests/` (it's a Script, but kept inside this Experts subtree so the project stays self-contained — it shows under MT5's *Experts* navigator group, not *Scripts*).
 - `.ex5` are build artifacts — don't commit.
 - End commit messages with the `Co-Authored-By: Claude ...` line.

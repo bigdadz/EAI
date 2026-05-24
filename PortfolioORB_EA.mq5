@@ -23,14 +23,17 @@ input ENUM_TIMEFRAMES InpTimeframe        = PERIOD_M5;
 input bool            InpDebugMode        = false;
 
 input group "Portfolio (per-symbol, comma-separated, same order)"
-//input string InpSymbols        = "GBPUSDm,EURUSDm,USDJPYm,XAUUSDm";
-//input string InpORStartHours   = "6,7,8,9";       // per symbol
-//input string InpORWindowMins   = "30,30,15,60";   // per symbol (OR length)
-//input string InpMaxSpreadPts   = "40,40,40,600";  // per symbol
-input string InpSymbols="XAUUSDm";
-input string InpORStartHours="12";
-input string InpORWindowMins="15";
-input string InpMaxSpreadPts="600";
+// InpSymbolSuffix is appended to every BASE name below AND to InpCorrGroups members,
+// so the same base list works on any broker — switch brokers by changing ONLY the suffix:
+//   Exness="m"  IUX Standard=".iux"  IUX(other account)="."  plain/none=""
+// Active = validated 2-leg JPY+Gold (net-positive every year on IUX, 2024-2026).
+// GBPUSD/EURUSD London legs DROPPED (lose every year on IUX). Full 4-leg config for reference:
+//   InpSymbols="GBPUSD,EURUSD,USDJPY,XAUUSD" InpORStartHours="6,6,9,12" InpORWindowMins="30,30,30,15" InpMaxSpreadPts="40,40,40,600" InpCorrGroups="GBPUSD,EURUSD"
+input string InpSymbolSuffix = ".iux";
+input string InpSymbols      = "USDJPY,XAUUSD";  // BASE names (suffix appended)
+input string InpORStartHours = "9,12";           // per symbol
+input string InpORWindowMins = "30,15";          // per symbol (OR length)
+input string InpMaxSpreadPts = "40,600";         // per symbol
 
 input group "Session (shared) — trade window measured from each symbol's OR end"
 input int  InpTradeWindowMins  = 210;   // entries allowed for N min after OR end (210 = GBP 06:30->10:00)
@@ -76,7 +79,7 @@ input int             InpRetestTimeoutBars     = 6;
 
 input group "Correlation guard"
 input bool   InpUseCorrGuard = true;
-input string InpCorrGroups   = "GBPUSDm,EURUSDm";  // ; separates groups, , separates members
+input string InpCorrGroups   = "";   // BASE names (suffix auto-applied); ; = groups, , = members. e.g. "GBPUSD,EURUSD" when FX legs active; empty for JPY+Gold (uncorrelated).
 
 input group "Display"
 input bool InpShowDashboard = true;
@@ -101,6 +104,15 @@ int    g_symCount = 0;
 int SplitCSV(const string s, string &parts[])
 {
    return StringSplit(s, ',', parts);
+}
+
+// Append the broker suffix to a BASE symbol name (trims surrounding spaces first),
+// so InpSymbols/InpCorrGroups stay broker-agnostic. Suffix "" => base name unchanged.
+string WithSuffix(string base)
+{
+   StringTrimLeft(base);
+   StringTrimRight(base);
+   return base + InpSymbolSuffix;
 }
 
 struct SymbolState
@@ -141,7 +153,7 @@ int OnInit()
 
    for(int i = 0; i < n; i++)
    {
-      g_symbol[i]   = syms[i];
+      g_symbol[i]   = WithSuffix(syms[i]);
       g_orStartH[i] = (int)StringToInteger(shs[i]);
       g_orStartM[i] = 0;
       int win       = (int)StringToInteger(wins[i]);
@@ -492,13 +504,14 @@ bool CorrBlocked(int i, ENUM_SIGNAL dir)
       string members[];
       int nm = StringSplit(groups[gi], ',', members);
       bool iInGroup = false;
-      for(int m = 0; m < nm; m++) if(members[m] == g_symbol[i]) { iInGroup = true; break; }
+      for(int m = 0; m < nm; m++) if(WithSuffix(members[m]) == g_symbol[i]) { iInGroup = true; break; }
       if(!iInGroup) continue;
       // i is in this group: scan other members for a same-direction open position
       for(int m = 0; m < nm; m++)
       {
-         if(members[m] == g_symbol[i]) continue;
-         if(PositionSelect(members[m]) && PositionGetInteger(POSITION_MAGIC) == InpMagic)
+         string mem = WithSuffix(members[m]);
+         if(mem == g_symbol[i]) continue;
+         if(PositionSelect(mem) && PositionGetInteger(POSITION_MAGIC) == InpMagic)
          {
             long t = PositionGetInteger(POSITION_TYPE);
             ENUM_SIGNAL openDir = (t == POSITION_TYPE_BUY) ? SIGNAL_BUY : SIGNAL_SELL;

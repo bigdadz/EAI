@@ -7,8 +7,8 @@
 //+------------------------------------------------------------------+
 #property version "1.00"
 
-// Symbols to probe (IUX uses a TRAILING DOT). The chart symbol is added too.
-string g_symbols[] = { "GBPUSD.", "XAUUSD.", "XAUUSD.iux", "EURUSD.", "BTCUSD." };
+// Symbols to probe (IUX Standard => .iux suffix). The chart symbol is added too.
+string g_symbols[] = { "GBPUSD.iux", "EURUSD.iux", "USDJPY.iux", "XAUUSD.iux", "AUDJPY.iux", "AUDUSD.iux" };
 
 void DumpOne(int fh, string sym)
 {
