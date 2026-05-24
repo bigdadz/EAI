@@ -26,14 +26,16 @@ input group "Portfolio (per-symbol, comma-separated, same order)"
 // InpSymbolSuffix is appended to every BASE name below AND to InpCorrGroups members,
 // so the same base list works on any broker — switch brokers by changing ONLY the suffix:
 //   Exness="m"  IUX Standard=".iux"  IUX(other account)="."  plain/none=""
-// Active = validated 2-leg JPY+Gold (net-positive every year on IUX, 2024-2026).
-// GBPUSD/EURUSD London legs DROPPED (lose every year on IUX). Full 4-leg config for reference:
+// Active = Exness gold-only standalone (suffix "m"; OR breakout ~19:00 TH winter / 18:00 summer).
+// Validated IUX 2-leg JPY+Gold (net-positive every year on IUX 2024-2026) kept for reference:
+//   InpSymbols="USDJPY,XAUUSD" InpORStartHours="9,12" InpORWindowMins="30,15" InpMaxSpreadPts="40,600" InpSymbolSuffix=".iux"
+// Full 4-leg (Exness-tuned) config for reference:
 //   InpSymbols="GBPUSD,EURUSD,USDJPY,XAUUSD" InpORStartHours="6,6,9,12" InpORWindowMins="30,30,30,15" InpMaxSpreadPts="40,40,40,600" InpCorrGroups="GBPUSD,EURUSD"
-input string InpSymbolSuffix = ".iux";
-input string InpSymbols      = "USDJPY,XAUUSD";  // BASE names (suffix appended)
-input string InpORStartHours = "9,12";           // per symbol
-input string InpORWindowMins = "30,15";          // per symbol (OR length)
-input string InpMaxSpreadPts = "40,600";         // per symbol
+input string InpSymbolSuffix = "m";
+input string InpSymbols      = "XAUUSD";  // BASE names (suffix appended)
+input string InpORStartHours = "12";      // per symbol
+input string InpORWindowMins = "15";      // per symbol (OR length)
+input string InpMaxSpreadPts = "600";     // per symbol
 
 input group "Session (shared) — trade window measured from each symbol's OR end"
 input int  InpTradeWindowMins  = 210;   // entries allowed for N min after OR end (210 = GBP 06:30->10:00)
